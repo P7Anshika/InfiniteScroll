@@ -1,0 +1,369 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  CircularProgress,
+  Avatar,
+  Divider,
+  Button,
+  Chip,
+  Skeleton,
+  TextField,
+  InputAdornment,
+  IconButton,
+  MenuItem,
+  Select,
+  FormControl,
+  useMediaQuery,
+  useTheme
+} from '@mui/material';
+import {
+  Search,
+  LocationOn,
+  WorkOutline,
+  Clear,
+  FilterList,
+  BookmarkBorder,
+  Bookmark
+} from '@mui/icons-material';
+import InfiniteScroll from 'react-infinite-scroll-component';
+
+// Enhanced mock data with more fields
+const fetchJobs = async (page, limit = 10, filters = {}) => {
+  return new Promise(resolve => {
+    setTimeout(() => {
+      const jobTypes = ['Full-time', 'Part-time', 'Contract', 'Internship'];
+      const experienceLevels = ['Entry', 'Mid', 'Senior', 'Lead'];
+      
+      const mockJobs = Array.from({ length: limit }, (_, i) => ({
+        id: `job-${page}-${i}`,
+        title: `Software Engineer ${page}-${i}`,
+        company: `Tech Company ${Math.floor(Math.random() * 10) + 1}`,
+        logo: `https://picsum.photos/100/100?random=${page}${i}`,
+        location: ['Remote', 'New York', 'San Francisco', 'London', 'Berlin'][Math.floor(Math.random() * 5)],
+        salary: `$${(Math.random() * 50 + 80).toFixed(0)}k - $${(Math.random() * 50 + 120).toFixed(0)}k`,
+        description: 'We are looking for a skilled software engineer to join our growing team. You will work on cutting-edge technologies and collaborate with talented professionals.',
+        posted: `${Math.floor(Math.random() * 30) + 1} days ago`,
+        skills: ['React', 'Node.js', 'TypeScript', 'AWS', 'GraphQL', 'Docker', 'Kubernetes'].slice(0, Math.floor(Math.random() * 5) + 1),
+        type: jobTypes[Math.floor(Math.random() * jobTypes.length)],
+        experience: experienceLevels[Math.floor(Math.random() * experienceLevels.length)],
+        isSaved: Math.random() > 0.7
+      }));
+      
+      // Apply simple filtering for demo purposes
+      let filteredJobs = mockJobs;
+      if (filters.search) {
+        filteredJobs = filteredJobs.filter(job => 
+          job.title.toLowerCase().includes(filters.search.toLowerCase()) ||
+          job.company.toLowerCase().includes(filters.search.toLowerCase())
+        );
+      }
+      if (filters.location) {
+        filteredJobs = filteredJobs.filter(job => 
+          job.location === filters.location
+        );
+      }
+      
+      resolve(filteredJobs);
+    }, 500);
+  });
+};
+
+const JobCard = ({ job, onSave }) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  
+  return (
+    <Card sx={{ 
+      mb: 3, 
+      boxShadow: 2,
+      borderLeft: `4px solid ${theme.palette.primary.main}`,
+      transition: 'transform 0.2s, box-shadow 0.2s',
+      '&:hover': {
+        transform: 'translateY(-2px)',
+        boxShadow: 4
+      }
+    }}>
+      <CardContent>
+        <Box display="flex" alignItems="flex-start" mb={2}>
+          <Avatar 
+            src={job.logo} 
+            alt={job.company}
+            sx={{ 
+              width: 56, 
+              height: 56, 
+              mr: 2,
+              border: `1px solid ${theme.palette.divider}`
+            }} 
+          />
+          <Box flexGrow={1}>
+            <Box display="flex" justifyContent="space-between" alignItems="flex-start">
+              <Box>
+                <Typography variant="h6" component="h2" sx={{ fontWeight: 600 }}>
+                  {job.title}
+                </Typography>
+                <Typography color="text.secondary" sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
+                  <WorkOutline fontSize="small" sx={{ mr: 0.5 }} />
+                  {job.company} • {job.type}
+                </Typography>
+              </Box>
+              <IconButton onClick={() => onSave(job.id)}>
+                {job.isSaved ? <Bookmark color="primary" /> : <BookmarkBorder />}
+              </IconButton>
+            </Box>
+            
+            <Box display="flex" flexWrap="wrap" alignItems="center" mt={1} mb={1.5}>
+              <Chip 
+                label={job.location} 
+                size="small" 
+                icon={<LocationOn fontSize="small" />}
+                sx={{ mr: 1, mb: 1 }} 
+              />
+              <Chip 
+                label={job.experience} 
+                size="small" 
+                color="secondary"
+                sx={{ mr: 1, mb: 1 }} 
+              />
+              <Chip 
+                label={job.salary} 
+                size="small" 
+                sx={{ 
+                  mr: 1, 
+                  mb: 1,
+                  backgroundColor: theme.palette.success.light,
+                  color: theme.palette.success.dark
+                }} 
+              />
+            </Box>
+            
+            <Typography variant="body2" paragraph sx={{ mb: 2 }}>
+              {job.description}
+            </Typography>
+            
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+              {job.skills.map(skill => (
+                <Chip 
+                  key={skill} 
+                  label={skill} 
+                  size="small" 
+                  variant="outlined"
+                />
+              ))}
+            </Box>
+            
+            <Box display="flex" justifyContent="space-between" alignItems="center">
+              <Typography variant="caption" color="text.secondary">
+                Posted {job.posted}
+              </Typography>
+              <Button 
+                variant="contained" 
+                size={isMobile ? 'small' : 'medium'}
+                sx={{ borderRadius: 2 }}
+              >
+                Apply Now
+              </Button>
+            </Box>
+          </Box>
+        </Box>
+      </CardContent>
+    </Card>
+  );
+};
+
+const JobListInfiniteScroll = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const [jobs, setJobs] = useState([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [locationFilter, setLocationFilter] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  
+  const loadMoreJobs = useCallback(async () => {
+    if (isLoading) return;
+    
+    setIsLoading(true);
+    try {
+      const newJobs = await fetchJobs(page, 10, { 
+        search: searchQuery,
+        location: locationFilter
+      });
+      
+      setJobs(prev => page === 1 ? newJobs : [...prev, ...newJobs]);
+      setPage(prev => prev + 1);
+      setHasMore(newJobs.length > 0);
+      
+      if (isInitialLoad) setIsInitialLoad(false);
+    } catch (error) {
+      console.error('Error fetching jobs:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [page, isLoading, searchQuery, locationFilter, isInitialLoad]);
+
+  // Reset and reload when filters change
+  useEffect(() => {
+    setPage(1);
+    setJobs([]);
+    setHasMore(true);
+    loadMoreJobs();
+  }, [searchQuery, locationFilter]);
+
+  const handleSaveJob = (jobId) => {
+    setJobs(jobs.map(job => 
+      job.id === jobId ? { ...job, isSaved: !job.isSaved } : job
+    ));
+  };
+
+  const handleClearSearch = () => {
+    setSearchQuery('');
+    setLocationFilter('');
+  };
+
+  return (
+    <Box sx={{ maxWidth: 1200, mx: 'auto', p: isMobile ? 1 : 3 }}>
+      <Typography variant="h4" component="h1" sx={{ 
+        fontWeight: 700, 
+        mb: 3,
+        color: theme.palette.primary.dark
+      }}>
+        Find Your Dream Job
+      </Typography>
+      
+      {/* Search and Filter Bar */}
+      <Box sx={{ 
+        mb: 4,
+        p: 2,
+        backgroundColor: theme.palette.background.paper,
+        borderRadius: 2,
+        boxShadow: 1
+      }}>
+        <Box display="flex" flexDirection={isMobile ? 'column' : 'row'} gap={2}>
+          <TextField
+            fullWidth
+            variant="outlined"
+            placeholder="Search jobs or companies"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search />
+                </InputAdornment>
+              ),
+              endAdornment: searchQuery && (
+                <InputAdornment position="end">
+                  <IconButton onClick={handleClearSearch}>
+                    <Clear />
+                  </IconButton>
+                </InputAdornment>
+              ),
+              sx: { borderRadius: 2 }
+            }}
+          />
+          
+          <Button 
+            variant="outlined" 
+            startIcon={<FilterList />}
+            onClick={() => setShowFilters(!showFilters)}
+            sx={{ 
+              minWidth: 120,
+              borderRadius: 2
+            }}
+          >
+            Filters
+          </Button>
+        </Box>
+        
+        {showFilters && (
+          <Box mt={2} display="flex" gap={2} flexWrap="wrap">
+            <FormControl sx={{ minWidth: 180 }}>
+              <Select
+                value={locationFilter}
+                onChange={(e) => setLocationFilter(e.target.value)}
+                displayEmpty
+                inputProps={{ 'aria-label': 'Location filter' }}
+                sx={{ borderRadius: 2 }}
+              >
+                <MenuItem value="">All Locations</MenuItem>
+                <MenuItem value="Remote">Remote</MenuItem>
+                <MenuItem value="New York">New York</MenuItem>
+                <MenuItem value="San Francisco">San Francisco</MenuItem>
+                <MenuItem value="London">London</MenuItem>
+                <MenuItem value="Berlin">Berlin</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+        )}
+      </Box>
+      
+      {/* Saved jobs count */}
+      {jobs.some(job => job.isSaved) && (
+        <Typography variant="subtitle1" sx={{ mb: 2 }}>
+          {jobs.filter(job => job.isSaved).length} saved jobs
+        </Typography>
+      )}
+      
+      <InfiniteScroll
+        dataLength={jobs.length}
+        next={loadMoreJobs}
+        hasMore={hasMore}
+        loader={
+          <Box display="flex" justifyContent="center" p={3}>
+            <CircularProgress />
+          </Box>
+        }
+        endMessage={
+          !isInitialLoad && (
+            <Box textAlign="center" p={3}>
+              <Typography variant="body1" color="text.secondary">
+                {jobs.length === 0 ? 
+                  "No jobs match your search criteria" : 
+                  "You've reached the end of job listings"}
+              </Typography>
+              {jobs.length === 0 && (
+                <Button 
+                  variant="outlined" 
+                  onClick={handleClearSearch}
+                  sx={{ mt: 2 }}
+                >
+                  Clear filters
+                </Button>
+              )}
+            </Box>
+          )
+        }
+      >
+        {isInitialLoad ? (
+          Array.from({ length: 3 }).map((_, index) => (
+            <Skeleton 
+              key={index} 
+              variant="rectangular" 
+              height={200} 
+              sx={{ 
+                mb: 2, 
+                borderRadius: 2 
+              }} 
+            />
+          ))
+        ) : (
+          jobs.map(job => (
+            <JobCard 
+              key={job.id} 
+              job={job} 
+              onSave={handleSaveJob} 
+            />
+          ))
+        )}
+      </InfiniteScroll>
+    </Box>
+  );
+};
+
+export default JobListInfiniteScroll;
