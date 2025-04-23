@@ -1,0 +1,137 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  CircularProgress,
+  Avatar,
+  Divider,
+  Button,
+  Chip
+} from '@mui/material';
+import InfiniteScroll from 'react-infinite-scroll-component';
+
+// Mock data fetch function
+const fetchJobs = async (page, limit = 10) => {
+  // In a real app, this would be an API call
+  return new Promise(resolve => {
+    setTimeout(() => {
+      const mockJobs = Array.from({ length: limit }, (_, i) => ({
+        id: `job-${page}-${i}`,
+        title: `Software Engineer ${page}-${i}`,
+        company: `Tech Company ${Math.floor(Math.random() * 10) + 1}`,
+        location: ['Remote', 'New York', 'San Francisco', 'London'][Math.floor(Math.random() * 4)],
+        salary: `$${(Math.random() * 50 + 80).toFixed(0)}k - $${(Math.random() * 50 + 120).toFixed(0)}k`,
+        description: 'We are looking for a skilled software engineer to join our team...',
+        posted: `${Math.floor(Math.random() * 30) + 1} days ago`,
+        skills: ['React', 'Node.js', 'TypeScript', 'AWS'].slice(0, Math.floor(Math.random() * 4) + 1)
+      }));
+      resolve(mockJobs);
+    }, 800); // Simulate network delay
+  });
+};
+
+const JobCard = ({ job }) => (
+  <Card sx={{ mb: 2, boxShadow: 2 }}>
+    <CardContent>
+      <Box display="flex" alignItems="center" mb={2}>
+        <Avatar sx={{ bgcolor: 'primary.main', mr: 2 }}>
+          {job.company.charAt(0)}
+        </Avatar>
+        <Box>
+          <Typography variant="h6">{job.title}</Typography>
+          <Typography color="text.secondary">{job.company} • {job.location}</Typography>
+        </Box>
+      </Box>
+      
+      <Typography variant="body2" paragraph>{job.description}</Typography>
+      
+      <Box mb={2}>
+        {job.skills.map(skill => (
+          <Chip key={skill} label={skill} size="small" sx={{ mr: 1, mb: 1 }} />
+        ))}
+      </Box>
+      
+      <Box display="flex" justifyContent="space-between" alignItems="center">
+        <Typography variant="subtitle2">{job.salary}</Typography>
+        <Typography variant="caption" color="text.secondary">
+          Posted {job.posted}
+        </Typography>
+      </Box>
+      
+      <Box mt={2} display="flex" justifyContent="flex-end">
+        <Button variant="contained" size="small">Apply</Button>
+      </Box>
+    </CardContent>
+  </Card>
+);
+
+const JobListInfiniteScroll = () => {
+  const [jobs, setJobs] = useState([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const loadMoreJobs = async () => {
+    if (isLoading) return;
+    
+    setIsLoading(true);
+    try {
+      const newJobs = await fetchJobs(page);
+      setJobs(prev => [...prev, ...newJobs]);
+      setPage(prev => prev + 1);
+      
+      // In a real app, you'd check if the API returns fewer items than requested
+      if (newJobs.length < 10) {
+        setHasMore(false);
+      }
+    } catch (error) {
+      console.error('Error fetching jobs:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadMoreJobs();
+  }, []);
+
+  return (
+    <Box sx={{ maxWidth: 800, mx: 'auto', p: 2 }}>
+      <Typography variant="h4" gutterBottom>
+        Available Jobs
+      </Typography>
+      
+      <InfiniteScroll
+        dataLength={jobs.length}
+        next={loadMoreJobs}
+        hasMore={hasMore}
+        loader={
+          <Box display="flex" justifyContent="center" p={2}>
+            <CircularProgress />
+          </Box>
+        }
+        endMessage={
+          <Box textAlign="center" p={2}>
+            <Typography variant="body2" color="text.secondary">
+              You've seen all jobs for now
+            </Typography>
+          </Box>
+        }
+      >
+        {jobs.map(job => (
+          <JobCard key={job.id} job={job} />
+        ))}
+      </InfiniteScroll>
+      
+      {jobs.length === 0 && !isLoading && (
+        <Typography textAlign="center" p={4}>
+          No jobs found
+        </Typography>
+      )}
+    </Box>
+  );
+};
+
+export default JobListInfiniteScroll;
