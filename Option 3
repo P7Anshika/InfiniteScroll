@@ -1,0 +1,68 @@
+import { useState, useEffect } from 'react';
+import { Box, Card, Typography, CircularProgress, Avatar, Button, Chip } from '@mui/material';
+import InfiniteScroll from 'react-infinite-scroll-component';
+
+// Mock data generator
+const fetchJobs = (page, limit = 10) => 
+  new Promise(resolve => setTimeout(() => resolve(
+    Array.from({ length: limit }, (_, i) => ({
+      id: `${page}-${i}`,
+      title: `Role ${page}-${i}`,
+      company: `Company ${i%5 + 1}`,
+      location: ['Remote', 'Hybrid', 'Onsite'][i%3],
+      salary: `$${80 + i*5}k`,
+      skills: ['React', 'Node', 'AWS'].slice(0, i%3 + 1)
+    }))
+  ), 500));
+
+const JobCard = ({ job }) => (
+  <Card sx={{ mb: 2, p: 2, '&:hover': { boxShadow: 3 } }}>
+    <Box display="flex" gap={2} alignItems="center">
+      <Avatar sx={{ bgcolor: 'primary.main' }}>{job.company[0]}</Avatar>
+      <Box>
+        <Typography variant="h6">{job.title}</Typography>
+        <Typography color="text.secondary">{job.company} • {job.location}</Typography>
+      </Box>
+    </Box>
+    
+    <Box display="flex" gap={1} my={1} flexWrap="wrap">
+      {job.skills.map(skill => <Chip key={skill} label={skill} size="small" />)}
+    </Box>
+    
+    <Box display="flex" justifyContent="space-between" alignItems="center">
+      <Typography>{job.salary}</Typography>
+      <Button variant="contained" size="small">Quick Apply</Button>
+    </Box>
+  </Card>
+);
+
+export default function JobList() {
+  const [jobs, setJobs] = useState([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+
+  const loadJobs = async () => {
+    const newJobs = await fetchJobs(page);
+    setJobs(prev => [...prev, ...newJobs]);
+    setPage(prev => prev + 1);
+    if (newJobs.length < 10) setHasMore(false);
+  };
+
+  useEffect(() => { loadJobs(); }, []);
+
+  return (
+    <Box sx={{ maxWidth: 800, mx: 'auto', p: 2 }}>
+      <Typography variant="h5" mb={3}>Latest Opportunities</Typography>
+      
+      <InfiniteScroll
+        dataLength={jobs.length}
+        next={loadJobs}
+        hasMore={hasMore}
+        loader={<Box textAlign="center" py={3}><CircularProgress /></Box>}
+        endMessage={<Typography textAlign="center" py={3} color="text.secondary">No more jobs</Typography>}
+      >
+        {jobs.map(job => <JobCard key={job.id} job={job} />)}
+      </InfiniteScroll>
+    </Box>
+  );
+}
